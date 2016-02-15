@@ -10,6 +10,7 @@ Practice.Routers = Practice.Routers || {};
       'notes/:id': 'showNoteDetail',
       'new': 'showNewNote',
       'notes/:id/edit': 'showEditNote',
+      'notes/search/:query': 'searchNote',
       '*actions': 'defaultRoute'
     },
 
@@ -30,22 +31,49 @@ Practice.Routers = Practice.Routers || {};
       Practice.headerContainer.empty();
     },
 
-    showNoteList: function() {
-      // コレクションを渡してメモ一覧の親ビューを初期化する。
-      var noteListView = new Practice.Views.NoteList({
-        collection: Practice.noteCollection
-      });
+    showNoteList: function(models) {
+      // 一覧表示用のコレクションを別途初期化する
+      if (!this.filteredCollection) {
+        this.filteredCollection = new Practice.Collections.Note();
+      }
 
-      // 表示領域にメモ一覧を表示する。
-      Practice.mainContainer.show(noteListView);
+      // NoteListViewのインスタンスが表示中でないときのみこれを初期化して表示する。
+      if (!Practice.mainContainer.has(Practice.Views.NoteList)) {
+        // 初期化の際に一覧表示用のコレクションを渡しておく
+        var noteListView = new Practice.Views.NoteList({
+          collection: this.filteredCollection
+        });
+        Practice.mainContainer.show(noteListView);
+      }
 
-      // メモ一覧操作ビューを表示するメソッドの呼び出しを追加する。
+      // 検索されたモデルの配列が引数に渡されていればそちらを、
+      // そうでなければすべてのモデルを持つPractice.noteCollection
+      // インスタンスのモデルの配列を使用する。
+      models = models || Practice.noteCollection.models;
+
+      // 一覧表示用のコレクションのreset()メソッドに採用したほうのモデルの配列を渡す。
+      this.filteredCollection.reset(models);
       this.showNoteControl();
     },
 
     showNoteControl: function() {
+      var self = this;
       var noteControlView = new Practice.Views.NoteControl();
+
+      // submit:formイベントの監視を追加する。
+      noteControlView.on('submit:form', function(query) {
+        self.searchNote(query);
+        self.navigate('notes/search/' + query);
+      });
+
       Practice.headerContainer.show(noteControlView);
+    },
+
+    searchNote: function(query) {
+      var filtered = Practice.noteCollection.filter(function(note) {
+        return note.get('title').indexOf(query) !== -1;
+      });
+      this.showNoteList(filtered);
     },
 
     showNewNote: function() {
